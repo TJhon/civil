@@ -1,0 +1,130 @@
+```{r}
+source("00pkg.r")
+
+df <- readr::read_csv(here("dat", "dat.csv"))
+
+clean_names(df)
+
+df 
+
+df1 <- df %>% 
+  clean_names() %>% 
+  filter(acepta_el_tratamiento_de_datos == "Acepto") %>% 
+  select(-c(1:5)) %>% 
+  mutate(
+    across(
+      where(is.character), tolower
+    )
+  ) %>% 
+  rename(nacimiento = 1) %>% 
+  select(-c(72, 73)) %>% 
+  rename(
+    satisfaccion = 71
+    ) 
+  
+df1 <-  df1 %>%   
+  mutate(id = c(1:nrow(df1))) %>% 
+  select(id, everything())
+
+d1 <- df1 %>% 
+  select(1:17) %>% 
+  rename(
+    f_menor18 = 5,
+    f_hombre = 6, 
+    f_mujer = 7,
+    jefe_ocu = 8, 
+    idiomas = 9, 
+    residencia = 10, 
+    vivienda_tipo = 11,
+    vivienda_tipo1 = 12,
+    vivienda_material_total = 13, 
+    vivienda_material_pisos = 14, 
+    vivienda_m2 = 15,
+    vivienda_m2_precio = 16, 
+    viviennda_precio_total = 17
+    )
+
+d2 <- df1 %>% 
+  select(c(1, 18:29)) %>% 
+  rename(
+    hogar_ingresos_cuantos = 2,
+    vivienda_vivir_anios = 3,
+    vivienda_cuartos = 4, 
+    vivienda_pisos = 5, 
+    vivienda_banos = 6,
+    ingreso_familiar = 7,
+    gasto_alimentos = alimentos, 
+    gasto_vestido = vestido,
+    gasto_edu = educacion, 
+    gasto_salud = salud,
+    gasto_transpor = transporte, 
+    gasto_diversion = diversion_y_esparcimiento
+  )
+
+d3 <- df1 %>% 
+  select(c(1, 30:46)) %>% 
+  rename(
+    servicio_agua = 2,
+    servicio_desague = 3,
+    servicio_telefono = 4, 
+    servicio_internet = 5,
+    servicio_electricidad = 6,
+    alr_calles_pavimentadas = 7, 
+    alr_zonas_verdes = 8, 
+    alr_parques_recreativas = 9, 
+    alr_auxilio_rap = 10, 
+    tiempo_comercial = 11,
+    tiempo_cultural = 12,
+    tiempo_escuela = 13, 
+    tiempo_universidad = 14, 
+    tiempo_salud = 15,
+    tiempo_aux_rap = 16, 
+    tiempo_via_principal = 17,
+    tiempo_iglesia = 18
+  )
+
+d4 <- df1 %>% 
+  select(c(1, 47:57)) %>% 
+  rename(
+    muni_recojo_basura = 2,
+    muni_man_parques = 3,
+    cal_servicio_agua = 4,
+    cal_servico_desague = 5, 
+    cal_servicio_telefono = 6, 
+    cal_servicio_internet = 7, 
+    cal_servicio_electricidad = 8,
+    cal_servicio_basura = 9, 
+    cal_servicio_seguridad = 10, 
+    cal_servicio_mant_parq = 11,
+    sentimiento_serguridad = 12
+  )
+
+d5 <- df1 %>% 
+  select(c(1, 58:72)) %>% 
+  rename(
+    covid_positivo = 2, 
+    covid_prueba =3, 
+    covid_sintomas = 4, 
+    covid_conocido_sintomas = 5, 
+    covid_contacto_sintomas = 6,
+    covid_prevencion = 7, 
+    covid_tratar = 8,
+    covid_atencion_puesto_salud = 9, 
+    covid_desempleo = 10,
+    covid_depresion = 11,
+    covid_conflictos = 12,
+    covid_internados = 13, 
+    covid_muerte = 14,
+    covid_higiene = 15
+  )
+```
+
+```{r}
+full_join(d1, d2, by = "id") %>% 
+  full_join(d3, by = "id") %>% 
+  full_join(d4, by = "id") %>% 
+  full_join(d5, by = "id") %>% 
+  saveRDS(here("dat", "names.rds"))
+```
+
+

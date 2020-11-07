@@ -1,0 +1,401 @@
+---
+title: "Datos"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r set, echo=F,}
+knitr::opts_chunk$set(
+  echo = F, 
+  warning = F,
+  message = F
+)
+```
+
+
+```{r}
+source(here::here("code", "00pkg.r"))
+```
+
+```{r}
+df <- read_rds(here("dat", "names.rds"))
+```
+
+# modificacion general
+
+
+
+# variables no modificadas
+
+
+
+```{r}
+vnm <- df %>% 
+  select(
+    c(id, edad, genero, sentimiento_serguridad, satisfaccion)
+    ) %>% 
+  mutate(sentimiento_serguridad = ifelse(sentimiento_serguridad == "sí", 1, 0)) %>% 
+  mutate(genero = ifelse(genero == "hombre", 1, 0))
+```
+
+
+
+
+
+# Variables modificadas
+
+```{r, include=F}
+df %>% 
+  select(!c(id, edad, genero, sentimiento_serguridad, satisfaccion)) %>%
+  select(-contains(c("servicio", 
+                     "servico"))) %>% 
+  select(!contains("covid")) %>% 
+  select(!contains("tiempo")) %>% 
+  select(!contains("vivienda"), -viviennda_precio_total) %>% 
+  select(!contains("gasto")) %>% 
+  select(!contains("alr")) %>% 
+  select(!contains("f_")) %>% 
+  select(!contains("ingre")) %>%
+  select(!c(nacimiento, jefe_ocu, idiomas, residencia)) %>% 
+  names()
+
+sino <- function(column){
+  case_when(
+    column == "si" ~ 1,
+    column == "no" ~ 0,
+    column == "1" ~ 1,
+    column == "2" ~ 2,
+    column == "3" ~ 3,
+    column == "4" ~ 4,
+    column == "5 a más" ~ 5,
+    column == "muy bueno" ~ 5,
+    column == "bueno" ~ 4,
+    column == "regular" ~ 3,
+    column == "malo" ~ 2,
+    column == "muy malo" ~ 1
+    
+  ) 
+}
+
+na_replace <- function(column){
+  replace_na(column, 0)
+}
+```
+
+## covid 19
+
+```{r}
+covid <- df %>% 
+  select(1,
+    contains("covid")
+  ) %>% 
+  mutate_if(
+    is_character, funs(
+      sino
+    )
+  ) %>% 
+  mutate_if(
+    is_double, funs(
+      na_replace
+    )
+  )
+
+
+
+```
+
+
+
+
+## Servicios
+
+
+```{r}
+library(glue)
+servicio <- df %>% 
+select(1, contains(c("servicio", "servico"))) %>% 
+  mutate_if(
+    is_character, funs(
+      sino
+    )
+  ) %>% 
+  mutate_if(
+    is_double, funs(
+      na_replace
+    )
+  ) %>%
+  rename(cal_servicio_desague = cal_servico_desague)
+
+servicio
+
+servicio %>% 
+  pivot_longer(!id) %>% 
+  separate(name, c("val", "tipo", "none"), sep = "_") %>% 
+  mutate(tipo = case_when(tipo != "servicio" ~ tipo)) %>% 
+  mutate(tipo = replace_na(tipo, ""), 
+         none = replace_na(none, "")) %>% 
+  unite("n",tipo, none, sep = "") %>% 
+  pivot_wider(names_from = val, values_from = value) %>% 
+  mutate(tiene_servicio = ifelse(cal == 0, 0, 1)) %>% 
+  group_by(id) %>%
+  summarise(n, n_servicio = sum(tiene_servicio), cal) %>% 
+  ungroup() %>% 
+  group_by(id, n_servicio) %>% 
+  summarise(prom_cal = mean(cal)) %>% 
+  ungroup()
+
+```
+
+
+
+### servicios de la municipalidad
+
+```{r}
+muni <- df %>% 
+  select(
+    1, contains("muni")
+  ) %>% 
+  mutate_if(is.character, sino) 
+
+```
+
+
+
+## Tiempo
+
+
+
+```{r}
+tiempo <- df %>% 
+  select(1, contains("tiempo")) %>% 
+  pivot_longer(!id) %>% 
+  #separate(name, c("non", "lugar", "adicional")) %>% 
+  #separate(value, c("min", "maximo", "medicion")) %>% 
+  #unite("lugar", lugar, adicional, sep = " ") %>% 
+  #select(!non)
+  separate(value, c("min", "max", "escala")) %>% 
+  mutate_if(is.character, na_replace) %>% 
+  mutate(min = as.numeric(min),
+         max = as.numeric(max)) %>% 
+  mutate(tiempo = (min + max) / 2* ifelse(escala == "minutos", 1, 60)) %>% 
+  mutate(tiempo1 = tiempo + 0) %>% 
+  select(!c(min, max, escala)) %>% 
+  pivot_wider(names_from = name, values_from = tiempo1) %>% 
+  mutate_if(is.numeric, na_replace) %>% 
+  select(!tiempo)
+```
+
+
+## vivienda
+
+```{r}
+casa_c <- function(column){
+  case_when(
+    column == "5 a más" ~ 5, 
+    column == "4" ~ 4, 
+    column == "3" ~ 3, 
+    column == "2" ~ 2, 
+    column == "1" ~ 1,
+    TRUE ~ 1
+    
+  ) 
+}
+
+na_replace1 <- function(column){
+  replace_na(column, 1)
+}
+
+vivienda <- df %>% 
+  select(1, contains("vivienda"), viviennda_precio_total) %>% 
+  select(!c(vivienda_tipo, vivienda_tipo1, vivienda_material_total, vivienda_material_pisos )) %>% 
+  mutate_if(
+    is_character, funs(
+      casa_c
+    )
+  ) %>% 
+  mutate_all(
+    funs(
+      na_replace1
+    )
+  ) %>%  
+  mutate(
+    valoracion_vivienda = ifelse(
+      viviennda_precio_total == 1, vivienda_m2 * vivienda_m2_precio, viviennda_precio_total
+    ))%>% 
+  select(!c(viviennda_precio_total))
+
+
+
+```
+
+
+
+
+## gastos
+
+```{r}
+gasto <- df %>% 
+  select(1,
+    contains("gasto")
+  ) %>% 
+  mutate_all(
+    funs(
+      na_replace
+    )
+  )
+  #pivot_longer(!id) %>% 
+  #separate(name, c("non", "gasto en")) %>% 
+  #select(!non) 
+```
+
+
+
+## alrededores
+
+
+
+```{r}
+alrededores <- df %>% 
+  select(1,
+    contains("alr")
+  ) %>% 
+  mutate_if(
+    is.character,
+    funs(
+      sino
+    )
+  ) %>% 
+  mutate_all(
+    funs(
+      na_replace
+    )
+  )# %>% 
+  #pivot_longer(!id) %>% 
+ # separate(name, c("non", "lugar" ,"l")) %>% 
+ # unite("existe", lugar, l, sep = " ") %>% 
+ # select(!non) %>% 
+ # head(10) %>% kableExtra::kbl()
+```
+
+
+
+## persona
+
+
+```{r}
+na_replace2 <- function(column){
+  replace_na(column, 0)
+}
+
+persona <- df %>% 
+  select(1,
+    nacimiento, 
+    jefe_ocu,
+    idiomas,
+    residencia,
+    contains("ingre"),
+    contains("f_")
+  ) %>%
+  mutate_if(
+    is.numeric, na_replace
+  ) %>% 
+  separate(nacimiento, c("region_n", "provincia_n"), sep = "([_,/-])") %>% 
+  separate(idiomas, c("idioma1", "idioma2", "idioma3", "idioma4"), extra = "drop") %>% 
+  separate(residencia, c("distrito", "zona"), sep = "-", extra = "drop") %>% 
+  mutate(total_integrantes = f_menor18 + f_hombre + f_mujer) %>% 
+  mutate_if(
+    is.character, na_replace2
+  ) %>% 
+  mutate(
+    jefe_ocu = case_when(
+      jefe_ocu == "trabajador dependiente" ~ 1,
+      jefe_ocu == "trabajador independiente" ~ 2,
+      jefe_ocu == "desempleado"~ 3, 
+      TRUE ~ 4
+    ),
+    distrito = case_when(
+      distrito == "huancayo " ~ 1,
+      distrito == "chilca " ~ 2,
+      distrito == "el tambo " ~3
+    ),
+    idioma1 = case_when(
+      idioma1 == "castellano" ~ 1,
+      idioma1 == "quechua" ~ 1,
+      idioma1 == "ingles" ~ 1,
+      idioma1 == "lengua" ~ 1,
+      idioma1 == "0" ~ 0,
+      TRUE ~ 1
+    ),
+    idioma2 = case_when(
+      idioma2 == "castellano" ~ 1,
+      idioma2 == "quechua" ~ 1,
+      idioma2 == "ingles" ~ 1,
+      idioma2 == "lengua" ~ 1,
+      idioma2 == "0" ~ 0,
+      TRUE ~ 1
+    ),
+    idioma3 = case_when(
+      idioma3 == "castellano" ~ 1,
+      idioma3 == "quechua" ~ 1,
+      idioma3 == "ingles" ~ 1,
+      idioma3 == "lengua" ~ 1,
+      idioma3 == "0" ~ 0,
+      TRUE ~ 1
+    ),
+    idioma4 = case_when(
+      idioma4 == "castellano" ~ 1,
+      idioma4 == "quechua" ~ 1,
+      idioma4 == "ingles" ~ 1,
+      idioma4 == "lengua" ~ 1,
+      idioma4 == "0" ~ 0,
+      TRUE ~ 1
+    )
+  ) %>% 
+  mutate(idiomas = idioma1 + idioma2 + idioma3 + idioma4) %>% 
+  select(!c(idioma1, idioma2, idioma3, idioma4, total_integrantes)) %>% 
+  mutate(lugar_n = str_to_sentence(word(region_n, 1)), 
+         lugar_n = ifelse(
+           lugar_n == "(Junin", "Junín", ifelse(
+             lugar_n == "El", "El Tambo", ifelse(
+               lugar_n == "Hvca", "Huancavelica", ifelse(
+                 lugar_n == "Hyo", "Huancayo", ifelse(
+                   lugar_n == "Hvca.", "Huancavelica", ifelse(
+                     lugar_n == "San", "San martin", ifelse(
+                       lugar_n=="Mi", "San martin", ifelse(
+                         lugar_n == "Los", "Huancayo", ifelse(
+                           lugar_n == "La", "La libertad", ifelse(
+                             lugar_n == "Jjunin" ,"Junin", ifelse(
+                               lugar_n == "Jiancavelica", "Huancavelica", lugar_n
+                             )
+                           )
+                         )
+                       )
+                     )
+                   )
+                 )
+               )
+             )
+           )
+         )) %>% 
+  mutate(
+    lugar_n = stringi::stri_trans_general(lugar_n, "Latin-ASCII"),
+    zona = str_to_sentence(zona)
+  ) %>% 
+  select(-c(region_n, provincia_n))
+
+persona %>% count(lugar_n)
+head(persona)
+```
+
+```{r}
+vnm %>% full_join(covid) %>% full_join(servicio) %>% full_join(muni) %>% full_join(tiempo) %>% 
+  full_join(vivienda) %>% full_join(gasto) %>% 
+  full_join(alrededores) %>% 
+  full_join(persona) %>% 
+  write_csv(here("dat", "limp.csv"))
+```
+
+
